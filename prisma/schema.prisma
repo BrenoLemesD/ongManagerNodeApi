@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String        @id @default(cuid())
+  name               String
+  email              String        @unique
+  password           String
+  role               String        @default("user")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  ongs               UserOng[]
+  tasksCreated       KanbanTask[]  @relation("TasksCreated")
+  tasksAssigned      KanbanTask[]  @relation("TasksAssigned")
+  taskHistoryActions TaskHistory[] @relation("TaskHistoryActor")
+}
+
+model Ong {
+  id                    String        @id @default(cuid())
+  name                  String
+  description           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  members               UserOng[]
+  tasks                 KanbanTask[]
+  financialTransactions Financial[]
+}
+
+model UserOng {
+  id                    String      @id @default(cuid())
+  userId                String
+  ongId                 String
+  role                  String      @default("member") // "admin" | "finance_manager" | "member"
+  createdAt             DateTime    @default(now())
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ong                   Ong         @relation(fields: [ongId], references: [id], onDelete: Cascade)
+  financialTransactions Financial[] @relation("CreatedBy")
+
+  @@unique([userId, ongId])
+}
+
+model KanbanTask {
+  id           String        @id @default(cuid())
+  title        String
+  description  String?
+  priority     String        @default("media") // baixa, media, alta, urgente
+  status       String        @default("a_fazer") // a_fazer, em_andamento, aguardando_aprovacao, concluido
+  deadline     DateTime?
+  ongId        String
+  createdById  String
+  assignedToId String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  ong          Ong           @relation(fields: [ongId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation("TasksCreated", fields: [createdById], references: [id])
+  assignedTo   User?         @relation("TasksAssigned", fields: [assignedToId], references: [id])
+  history      TaskHistory[]
+}
+
+model TaskHistory {
+  id             String     @id @default(cuid())
+  taskId         String
+  actorUserId    String?
+  action         String
+  previousStatus String?
+  newStatus      String?
+  createdAt      DateTime   @default(now())
+  task           KanbanTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actor          User?      @relation("TaskHistoryActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+}
+
+model Financial {
+  id          String   @id @default(cuid())
+  ongId       String
+  type        String // "receita" | "despesa"
+  amount      Decimal  @db.Decimal(10, 2)
+  description String
+  category    String // ex: "salario", "aluguel", "doacao", "outro"
+  date        DateTime
+  createdById String
+  status      String   @default("confirmado") // "pendente" | "confirmado"
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ong         Ong      @relation(fields: [ongId], references: [id], onDelete: Cascade)
+  createdBy   UserOng  @relation("CreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([ongId, date])
+  @@index([ongId, createdAt])
+}
