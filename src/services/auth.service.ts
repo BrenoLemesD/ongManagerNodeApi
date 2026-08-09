@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
 import { env } from "../config/env.js";
-import { RegisterInput, LoginInput, UpdateProfileInput, AuthResponse } from "../interfaces/auth.interface.js";
+import { sendMail } from "../config/mail.js";
+import { RegisterInput, LoginInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordInput, AuthResponse } from "../interfaces/auth.interface.js";
 import { AppError } from "../middlewares/error.middleware.js";
 
 export class AuthService {
@@ -163,5 +165,81 @@ export class AuthService {
     });
 
     return updatedUser;
+  }
+
+  async forgotPassword(data: ForgotPasswordInput) {
+    const user = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (!user) {
+      return { message: "Se o e-mail estiver cadastrado, um link de recuperação foi enviado." };
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora de expiração
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+      },
+    });
+
+    const frontendUrl = env.FRONTEND_URL || "http://localhost:5173";
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <h2>Recuperação de Senha - ONGManager</h2>
+        <p>Olá, <strong>${user.name}</strong>!</p>
+        <p>Recebemos uma solicitação para redefinir a sua senha de acesso à plataforma ONGManager.</p>
+        <p>Clique no botão abaixo para redefinir a sua senha (este link expira em 1 hora):</p>
+        <p style="margin: 20px 0;">
+          <a href="${resetUrl}" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            Redefinir Minha Senha
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #666;">Se você não solicitou a alteração, ignore este e-mail.</p>
+      </div>
+    `;
+
+    await sendMail({
+      to: user.email,
+      subject: "Recuperação de Senha - ONGManager",
+      html: htmlContent,
+    });
+
+    return { message: "Se o e-mail estiver cadastrado, um link de recuperação foi enviado." };
+  }
+
+  async resetPassword(data: ResetPasswordInput) {
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token: data.token },
+      include: { user: true },
+    });
+
+    if (!resetToken) {
+      throw new AppError("Token de recuperação inválido ou inexistente", 400);
+    }
+
+    if (new Date() > resetToken.expiresAt) {
+      await prisma.passwordResetToken.delete({ where: { id: resetToken.id } });
+      throw new AppError("Token de recuperação expirou", 400);
+    }
+
+    const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { password: hashedPassword },
+    });
+
+    await prisma.passwordResetToken.delete({
+      where: { id: resetToken.id },
+    });
+
+    return { message: "Senha redefinida com sucesso! Você já pode fazer login." };
   }
 }

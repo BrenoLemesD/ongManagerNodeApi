@@ -1,3 +1,4 @@
+import PDFDocument from "pdfkit";
 import { prisma } from "../config/prisma.js";
 import { CreateFinancialInput, UpdateFinancialInput, ListFinancialQuery, SummaryFinancialQuery } from "../interfaces/financial.interface.js";
 import { AppError } from "../middlewares/error.middleware.js";
@@ -216,5 +217,74 @@ export class FinancialService {
     });
 
     return { message: "Lançamento excluído com sucesso" };
+  }
+
+  async exportTransactions(userId: string, ongId: string, query: ListFinancialQuery, format: "csv" | "pdf" = "csv") {
+    await this.getMembership(userId, ongId);
+
+    const where: any = { ongId };
+
+    if (query.type) where.type = query.type;
+    if (query.category) where.category = query.category;
+    if (query.status) where.status = query.status;
+
+    if (query.startDate || query.endDate) {
+      where.date = {};
+      if (query.startDate) where.date.gte = new Date(query.startDate);
+      if (query.endDate) where.date.lte = new Date(query.endDate);
+    }
+
+    const transactions = await prisma.financial.findMany({
+      where,
+      orderBy: { date: "desc" },
+    });
+
+    if (format === "csv") {
+      const headers = ["ID", "Data", "Tipo", "Valor", "Descrição", "Categoria", "Status"];
+      const rows = transactions.map((t) => [
+        t.id,
+        t.date.toISOString().split("T")[0],
+        t.type,
+        Number(t.amount).toFixed(2),
+        `"${t.description.replace(/"/g, '""')}"`,
+        t.category,
+        t.status,
+      ]);
+
+      const csvString = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      return {
+        buffer: Buffer.from(csvString, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+        filename: `relatorio_financeiro_${ongId}_${Date.now()}.csv`,
+      };
+    } else {
+      return new Promise<{ buffer: Buffer; contentType: string; filename: string }>((resolve, reject) => {
+        const doc = new PDFDocument({ margin: 30 });
+        const buffers: Buffer[] = [];
+
+        doc.on("data", (chunk: Buffer) => buffers.push(chunk));
+        doc.on("end", () => {
+          const pdfBuffer = Buffer.concat(buffers);
+          resolve({
+            buffer: pdfBuffer,
+            contentType: "application/pdf",
+            filename: `relatorio_financeiro_${ongId}_${Date.now()}.pdf`,
+          });
+        });
+        doc.on("error", reject);
+
+        doc.fontSize(18).text("Relatório Financeiro - ONGManager", { align: "center" });
+        doc.moveDown();
+
+        doc.fontSize(12).text(`Total de Lançamentos: ${transactions.length}`);
+        doc.moveDown();
+
+        transactions.forEach((t, i) => {
+          doc.fontSize(10).text(`${i + 1}. [${t.date.toISOString().split("T")[0]}] ${t.type.toUpperCase()} - R$ ${Number(t.amount).toFixed(2)} | ${t.description} (${t.category}) - Status: ${t.status}`);
+        });
+
+        doc.end();
+      });
+    }
   }
 }

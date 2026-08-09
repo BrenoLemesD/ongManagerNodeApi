@@ -130,6 +130,52 @@ router.get("/summary", financialController.getSummary);
 
 /**
  * @openapi
+ * /ong/{ongId}/financial/export:
+ *   get:
+ *     summary: Exportar relatório financeiro em formato CSV ou PDF
+ *     tags: [Financeiro]
+ *     security:
+ *       - cookieAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: ongId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [csv, pdf]
+ *           default: csv
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [receita, despesa]
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Arquivo CSV ou PDF gerado para download.
+ */
+router.get("/export", financialController.exportTransactions);
+
+/**
+ * @openapi
  * /ong/{ongId}/financial/{id}:
  *   put:
  *     summary: Editar lançamento financeiro (Admin)

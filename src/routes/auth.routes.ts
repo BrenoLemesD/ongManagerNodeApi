@@ -124,6 +124,56 @@ router.patch("/me", authMiddleware, authController.updateProfile);
 
 /**
  * @openapi
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Solicitar envio de link de recuperação de senha por e-mail
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: joao@example.com
+ *     responses:
+ *       200:
+ *         description: Solicitação processada com sucesso (mensagem genérica enviada).
+ */
+router.post("/forgot-password", authController.forgotPassword);
+
+/**
+ * @openapi
+ * /auth/reset-password:
+ *   post:
+ *     summary: Redefinir senha utilizando o token recebido por e-mail
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, newPassword]
+ *             properties:
+ *               token:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *                 example: 654321
+ *     responses:
+ *       200:
+ *         description: Senha redefinida com sucesso.
+ *       400:
+ *         description: Token inválido ou expirado.
+ */
+router.post("/reset-password", authController.resetPassword);
+
+/**
+ * @openapi
  * /auth/logout:
  *   post:
  *     summary: Encerrar sessão e remover cookie de token

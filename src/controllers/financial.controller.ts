@@ -63,4 +63,20 @@ export class FinancialController {
       next(error);
     }
   }
+
+  async exportTransactions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ongId = req.params.ongId;
+      const query = listFinancialQuerySchema.parse(req.query);
+      const format = (req.query.format as "csv" | "pdf") || "csv";
+
+      const fileData = await financialService.exportTransactions(req.user!.id, ongId, query, format);
+
+      res.setHeader("Content-Type", fileData.contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${fileData.filename}"`);
+      res.send(fileData.buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

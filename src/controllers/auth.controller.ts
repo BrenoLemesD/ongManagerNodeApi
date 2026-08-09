@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/auth.service.js";
-import { registerSchema, loginSchema, updateProfileSchema } from "../interfaces/auth.interface.js";
+import { registerSchema, loginSchema, updateProfileSchema, forgotPasswordSchema, resetPasswordSchema } from "../interfaces/auth.interface.js";
 
 const authService = new AuthService();
 
@@ -57,6 +57,26 @@ export class AuthController {
       const data = updateProfileSchema.parse(req.body);
       const updatedUser = await authService.updateProfile(userId, data);
       res.status(200).json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = forgotPasswordSchema.parse(req.body);
+      const result = await authService.forgotPassword(data);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = resetPasswordSchema.parse(req.body);
+      const result = await authService.resetPassword(data);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

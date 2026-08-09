@@ -40,23 +40,36 @@ src/
 - **`POST /auth/login`**: Autenticação com geração de cookie `HTTP-Only` seguro (`token`).
 - **`GET /auth/me`**: Consulta dos dados do usuário autenticado.
 - **`PATCH /auth/me`**: Atualização dos dados do perfil (nome, e-mail) e alteração de senha do usuário logado.
+- **`POST /auth/forgot-password`**: Envio de e-mail de recuperação de senha 100% gratuito (Nodemailer / Ethereal).
+- **`POST /auth/reset-password`**: Redefinição de senha com validação de token temporário.
 - **`POST /auth/logout`**: Encerramento de sessão e remoção do cookie.
 
 ### 🏢 2. Gestão de ONGs e Voluntários (`/ong`)
 - **`POST /ong`**: Criação de novas ONGs.
 - **`GET /ong/user`**: Listagem de todas as ONGs associadas ao usuário logado.
-- **`GET /ong/:ongId/volunteers`**: Listagem de voluntários/membros da ONG especificada.
-- **`POST /ong/:ongId/volunteers`**: Cadastro/Adição de novos voluntários à ONG.
+- **`GET /ong/:id`**: Detalhes da ONG e nível de permissão do usuário.
+- **`PUT /ong/:id`**: Edição dos dados da ONG (Nome e Descrição/CNPJ - Admin).
+- **`DELETE /ong/:id`**: Exclusão da ONG via **Soft Delete** (`active: false` - Admin).
+- **`GET /ong/:ongId/members`**: Listagem de membros e voluntários da ONG.
+- **`POST /ong/:ongId/volunteers`**: Cadastro de novos voluntários na ONG.
+- **`PATCH /ong/:ongId/members/:memberId/role`**: Alteração de cargo do membro (`admin`, `finance_manager`, `member`).
+- **`DELETE /ong/:ongId/members/:memberId`**: Remoção de membro com proteção (impede remover o único admin ativo).
 
-### 📋 3. Quadro Kanban & Tarefas (`/ong/:ongId/kanban`)
+### 🔗 3. Sistema de Convites por Link (`/ong/...`)
+- **`POST /ong/:id/invites`**: Geração de link de convite único da ONG (Admin).
+- **`GET /ong/invites/:token`**: Consulta de detalhes públicos da ONG pelo token do convite.
+- **`POST /ong/invites/:token/join`**: Aceite do convite pelo voluntário logado para entrar na ONG.
+
+### 📋 4. Quadro Kanban & Tarefas (`/ong/:ongId/kanban`)
 - **`GET /ong/:ongId/kanban/tasks`**: Listagem de tarefas com filtros por status/prioridade.
 - **`POST /ong/:ongId/kanban/tasks`**: Criação de nova tarefa vinculada à ONG.
 - **`PATCH /ong/:ongId/kanban/tasks/:taskId/status`**: Atualização do status da tarefa (drag-and-drop no frontend).
 - **`GET /ong/:ongId/kanban/tasks/:taskId/history`**: Histórico auditável de movimentações e ações (`TaskHistory`).
 
-### 💰 4. Gestão Financeira (`/ong/:ongId/financial`)
+### 💰 5. Gestão Financeira (`/ong/:ongId/financial`)
 - **`GET /ong/:ongId/financial/transactions`**: Extrato financeiro com paginação e filtros (tipo: receita/despesa, categoria, período).
 - **`GET /ong/:ongId/financial/summary`**: Resumo consolidado de saldos, total de receitas e despesas.
+- **`GET /ong/:ongId/financial/export`**: Exportação de relatórios financeiros em **CSV** ou **PDF** (`?format=csv|pdf`).
 - **`POST /ong/:ongId/financial/transactions`**: Lançamento de novas receitas ou despesas.
 - **`PUT /ong/:ongId/financial/transactions/:id`**: Edição de lançamento financeiro existente.
 - **`DELETE /ong/:ongId/financial/transactions/:id`**: Exclusão de lançamento financeiro.

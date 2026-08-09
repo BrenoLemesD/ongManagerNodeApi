@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { OngService } from "../services/ong.service.js";
-import { createOngSchema, createVolunteerSchema, addMemberSchema } from "../interfaces/ong.interface.js";
+import { createOngSchema, updateOngSchema, createVolunteerSchema, addMemberSchema, updateMemberRoleSchema } from "../interfaces/ong.interface.js";
 
 const ongService = new OngService();
 
@@ -10,6 +10,27 @@ export class OngController {
       const data = createOngSchema.parse(req.body);
       const ong = await ongService.createOng(req.user!.id, data);
       res.status(201).json(ong);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateOng(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ongId = req.params.id;
+      const data = updateOngSchema.parse(req.body);
+      const updated = await ongService.updateOng(ongId, req.user!.id, data);
+      res.status(200).json(updated);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteOng(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ongId = req.params.id;
+      const result = await ongService.deleteOng(ongId, req.user!.id);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -66,10 +87,51 @@ export class OngController {
     }
   }
 
+  async updateMemberRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id: ongId, memberId } = req.params;
+      const data = updateMemberRoleSchema.parse(req.body);
+      const updated = await ongService.updateMemberRole(req.user!.id, ongId, memberId, data.role);
+      res.status(200).json(updated);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async removeMember(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id: ongId, memberId } = req.params;
       const result = await ongService.removeMember(req.user!.id, ongId, memberId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async generateInviteLink(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ongId = req.params.id;
+      const invite = await ongService.generateInviteLink(ongId, req.user!.id);
+      res.status(201).json(invite);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getInviteDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+      const invite = await ongService.getInviteDetails(token);
+      res.status(200).json(invite);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async acceptInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+      const result = await ongService.acceptInvite(req.user!.id, token);
       res.status(200).json(result);
     } catch (error) {
       next(error);

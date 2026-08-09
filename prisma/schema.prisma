@@ -8,28 +8,49 @@ datasource db {
 }
 
 model User {
-  id                 String        @id @default(cuid())
+  id                 String               @id @default(cuid())
   name               String
-  email              String        @unique
+  email              String               @unique
   password           String
-  role               String        @default("user")
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  role               String               @default("user")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   ongs               UserOng[]
-  tasksCreated       KanbanTask[]  @relation("TasksCreated")
-  tasksAssigned      KanbanTask[]  @relation("TasksAssigned")
-  taskHistoryActions TaskHistory[] @relation("TaskHistoryActor")
+  tasksCreated       KanbanTask[]         @relation("TasksCreated")
+  tasksAssigned      KanbanTask[]         @relation("TasksAssigned")
+  taskHistoryActions TaskHistory[]        @relation("TaskHistoryActor")
+  resetTokens        PasswordResetToken[]
 }
 
 model Ong {
-  id                    String        @id @default(cuid())
+  id                    String              @id @default(cuid())
   name                  String
   description           String?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  active                Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
   members               UserOng[]
   tasks                 KanbanTask[]
   financialTransactions Financial[]
+  invites               OngInviteToken[]
+}
+
+model OngInviteToken {
+  id        String    @id @default(cuid())
+  ongId     String
+  token     String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  ong       Ong       @relation(fields: [ongId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserOng {
