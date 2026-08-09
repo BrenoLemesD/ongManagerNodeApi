@@ -39,6 +39,7 @@ src/
 - **`POST /auth/register`**: Cadastro de novos usuários.
 - **`POST /auth/login`**: Autenticação com geração de cookie `HTTP-Only` seguro (`token`).
 - **`GET /auth/me`**: Consulta dos dados do usuário autenticado.
+- **`PATCH /auth/me`**: Atualização dos dados do perfil (nome, e-mail) e alteração de senha do usuário logado.
 - **`POST /auth/logout`**: Encerramento de sessão e remoção do cookie.
 
 ### 🏢 2. Gestão de ONGs e Voluntários (`/ong`)

@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
 import { env } from "../config/env.js";
-import { RegisterInput, LoginInput, AuthResponse } from "../interfaces/auth.interface.js";
+import { RegisterInput, LoginInput, UpdateProfileInput, AuthResponse } from "../interfaces/auth.interface.js";
 import { AppError } from "../middlewares/error.middleware.js";
 
 export class AuthService {
@@ -110,5 +110,58 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async updateProfile(userId: string, data: UpdateProfileInput) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppError("Usuário não encontrado", 404);
+    }
+
+    const updateData: { name?: string; email?: string; password?: string } = {};
+
+    if (data.name && data.name.trim() !== "") {
+      updateData.name = data.name;
+    }
+
+    if (data.email && data.email !== user.email) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: data.email },
+      });
+      if (existingUser) {
+        throw new AppError("E-mail já está em uso por outro usuário", 400);
+      }
+      updateData.email = data.email;
+    }
+
+    if (data.newPassword) {
+      if (!data.oldPassword) {
+        throw new AppError("Informe a senha atual para alterar a senha", 400);
+      }
+
+      const passwordMatch = await bcrypt.compare(data.oldPassword, user.password);
+      if (!passwordMatch) {
+        throw new AppError("Senha atual incorreta", 400);
+      }
+
+      updateData.password = await bcrypt.hash(data.newPassword, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        updatedAt: true,
+      },
+    });
+
+    return updatedUser;
   }
 }

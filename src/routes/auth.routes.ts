@@ -86,6 +86,44 @@ router.get("/me", authMiddleware, authController.getMe);
 
 /**
  * @openapi
+ * /auth/me:
+ *   patch:
+ *     summary: Atualizar dados de perfil ou alterar senha do usuário logado
+ *     tags: [Autenticação]
+ *     security:
+ *       - cookieAuth: []
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: João da Silva
+ *               email:
+ *                 type: string
+ *                 example: joao.silva@example.com
+ *               oldPassword:
+ *                 type: string
+ *                 example: 123456
+ *               newPassword:
+ *                 type: string
+ *                 example: 654321
+ *     responses:
+ *       200:
+ *         description: Perfil atualizado com sucesso.
+ *       400:
+ *         description: E-mail em uso ou senha atual incorreta.
+ *       401:
+ *         description: Não autorizado.
+ */
+router.patch("/me", authMiddleware, authController.updateProfile);
+
+/**
+ * @openapi
  * /auth/logout:
  *   post:
  *     summary: Encerrar sessão e remover cookie de token

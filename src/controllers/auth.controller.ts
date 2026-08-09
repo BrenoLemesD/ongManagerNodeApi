@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/auth.service.js";
-import { registerSchema, loginSchema } from "../interfaces/auth.interface.js";
+import { registerSchema, loginSchema, updateProfileSchema } from "../interfaces/auth.interface.js";
 
 const authService = new AuthService();
 
@@ -46,6 +46,17 @@ export class AuthController {
       const userId = req.user!.id;
       const user = await authService.getMe(userId);
       res.status(200).json(user);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const data = updateProfileSchema.parse(req.body);
+      const updatedUser = await authService.updateProfile(userId, data);
+      res.status(200).json(updatedUser);
     } catch (error) {
       next(error);
     }
