@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { AuthController } from "../controllers/auth.controller.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
+import { authLimiter } from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 const authController = new AuthController();
@@ -65,7 +66,7 @@ router.post("/register", authController.register);
  *       401:
  *         description: Credenciais inválidas.
  */
-router.post("/login", authController.login);
+router.post("/login", authLimiter, authController.login);
 
 /**
  * @openapi
@@ -143,7 +144,7 @@ router.patch("/me", authMiddleware, authController.updateProfile);
  *       200:
  *         description: Solicitação processada com sucesso (mensagem genérica enviada).
  */
-router.post("/forgot-password", authController.forgotPassword);
+router.post("/forgot-password", authLimiter, authController.forgotPassword);
 
 /**
  * @openapi
