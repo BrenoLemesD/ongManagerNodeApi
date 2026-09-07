@@ -49,12 +49,14 @@ O **ONGManager** é uma plataforma **multi-tenant por ONG**, desenvolvida como T
 - **`Financial`**: Lançamentos financeiros (`type`: receita/despesa, `amount`, `category`, `status`, `date`, `createdById`).
 - **`OngInviteToken`**: Tokens de convite público por link para entrar na ONG (`id`, `ongId`, `token`, `expiresAt`).
 - **`PasswordResetToken`**: Tokens temporários (1h) para redefinição de senha (`id`, `userId`, `token`, `expiresAt`).
+- **`Event`**: Eventos promovidos pela ONG (`id`, `title`, `description`, `date`, `location`, `maxTickets`, `status`, `inviteToken`, `ongId`, `createdById`, `hasLandingPage`, `landingTemplate`, `primaryColor`, `bannerUrl`, `ctaText`).
+- **`EventGuest`**: Participantes/convidados inscritos no evento (`id`, `eventId`, `name`, `email`, `phone`, `ticketCode`, `status`). Possui restrição de unicidade por evento e e-mail (`@@unique([eventId, email])`).
 
 ---
 
 ## 🔒 4. Níveis de Permissão (RBAC por ONG) e Decisões de Design
 
-1. **`admin`**: Acesso total. Pode editar dados da ONG, desativar a ONG (Soft Delete), gerenciar membros/cargos, gerar links de convite, gerenciar tarefas e controlar todas as movimentações financeiras.
+1. **`admin`**: Acesso total. Pode editar dados da ONG, desativar a ONG (Soft Delete), gerenciar membros/cargos, gerar links de convite, gerenciar tarefas, controlar todas as movimentações financeiras e gerenciar eventos com landing pages customizadas.
    - *Trava de Segurança*: Não é permitido remover ou rebaixar a função se for o **único administrador ativo** da ONG.
 2. **`finance_manager`**: Acesso completo ao módulo financeiro (criação de lançamentos, consulta de extratos, resumo e exportação em CSV/PDF).
 3. **`member` / `colaborador`**: Visualização e movimentação de tarefas no Kanban (`em_andamento`, `aguardando_aprovacao`) e consulta do resumo financeiro.
@@ -101,6 +103,19 @@ O **ONGManager** é uma plataforma **multi-tenant por ONG**, desenvolvida como T
 - `POST /ong/:ongId/financial/transactions` — Lançamento de nova receita ou despesa.
 - `PUT /ong/:ongId/financial/transactions/:id` — Edição de lançamento financeiro (Admin).
 - `DELETE /ong/:ongId/financial/transactions/:id` — Exclusão de lançamento financeiro (Admin).
+
+### 🎟️ **Módulo de Eventos & Landing Pages (`/ong/:ongId/events` e `/events/public`)**
+- `POST /ong/:ongId/events` — Criação de novo evento com cota de ingressos, geração de token de convite e configuração de Landing Page (Admin).
+- `GET /ong/:ongId/events` — Listagem dos eventos da ONG com status de ocupação, ingressos restantes, presenças e status da landing page.
+- `GET /ong/:ongId/events/:eventId` — Detalhes completos do evento, métricas e configuração visual da landing page.
+- `PUT /ong/:ongId/events/:eventId` — Edição de dados, cota e configurações visuais de landing page (Admin).
+- `DELETE /ong/:ongId/events/:eventId` — Exclusão do evento (Admin).
+- `GET /ong/:ongId/events/:eventId/guests` — Listagem de convidados/inscritos do evento com busca e filtros (Admin).
+- `PATCH /ong/:ongId/events/:eventId/guests/:guestId/status` — Check-in de presença ou alteração de status do participante (Admin).
+- `DELETE /ong/:ongId/events/:eventId/guests/:guestId` — Cancelamento manual de convidado, liberando vaga de ingresso (Admin).
+- `GET /events/public/:token` — Consulta pública dos detalhes do evento e ingressos disponíveis via link de convite.
+- `POST /events/public/:token/register` — Inscrição pública de convidado para o evento com emissão de ingresso digital (`ticketCode`).
+- `GET /events/public/landing/:eventId` — Retorno público dos dados completos da Landing Page (template, cores, banner, CTA, detalhes da ONG e vagas) para renderização SSR/SPA da página `/eventos/:id`.
 
 ---
 
