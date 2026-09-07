@@ -20,6 +20,7 @@ model User {
   tasksAssigned      KanbanTask[]         @relation("TasksAssigned")
   taskHistoryActions TaskHistory[]        @relation("TaskHistoryActor")
   resetTokens        PasswordResetToken[]
+  eventsCreated      Event[]              @relation("EventsCreated")
 }
 
 model Ong {
@@ -33,6 +34,7 @@ model Ong {
   tasks                 KanbanTask[]
   financialTransactions Financial[]
   invites               OngInviteToken[]
+  events                Event[]
 }
 
 model OngInviteToken {
@@ -116,4 +118,41 @@ model Financial {
 
   @@index([ongId, date])
   @@index([ongId, createdAt])
+}
+
+model Event {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  location    String?
+  maxTickets  Int
+  status      String       @default("ativo") // "ativo" | "encerrado" | "cancelado"
+  inviteToken String       @unique
+  ongId       String
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  ong         Ong          @relation(fields: [ongId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("EventsCreated", fields: [createdById], references: [id])
+  guests      EventGuest[]
+
+  @@index([ongId, date])
+  @@index([ongId, status])
+}
+
+model EventGuest {
+  id         String   @id @default(cuid())
+  eventId    String
+  name       String
+  email      String
+  phone      String?
+  ticketCode String   @unique
+  status     String   @default("confirmado") // "confirmado" | "presente" | "cancelado"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, email])
+  @@index([eventId, status])
 }
