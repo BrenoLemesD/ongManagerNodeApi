@@ -6,6 +6,26 @@ const eventController = new EventController();
 
 /**
  * @openapi
+ * /events/public/landing/{eventId}:
+ *   get:
+ *     summary: Obter dados públicos para renderização da Landing Page do evento
+ *     tags: [Eventos / Público]
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Dados do evento, ONG e configurações de template da Landing Page.
+ *       404:
+ *         description: Evento não encontrado ou sem Landing Page ativada.
+ */
+router.get("/landing/:eventId", eventController.getPublicLandingPage);
+
+/**
+ * @openapi
  * /events/public/{token}:
  *   get:
  *     summary: Obter detalhes públicos do evento pelo link de convite

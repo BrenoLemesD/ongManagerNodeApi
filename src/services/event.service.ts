@@ -15,6 +15,11 @@ export class EventService {
     return `${frontendUrl}/events/invite/${token}`;
   }
 
+  private getLandingPageUrl(eventId: string): string {
+    const frontendUrl = env.FRONTEND_URL || "http://localhost:5173";
+    return `${frontendUrl}/eventos/${eventId}`;
+  }
+
   private async getMembership(userId: string, ongId: string) {
     const membership = await prisma.userOng.findUnique({
       where: {
@@ -50,6 +55,11 @@ export class EventService {
         maxTickets: data.maxTickets,
         status: "ativo",
         inviteToken,
+        hasLandingPage: data.hasLandingPage ?? false,
+        landingTemplate: data.landingTemplate ?? "modern",
+        primaryColor: data.primaryColor ?? "#7c3aed",
+        bannerUrl: data.bannerUrl,
+        ctaText: data.ctaText ?? "Garantir meu Ingresso",
         ongId,
         createdById: userId,
       },
@@ -70,6 +80,7 @@ export class EventService {
       remainingTickets: event.maxTickets,
       isSoldOut: false,
       inviteUrl: this.getInviteUrl(event.inviteToken),
+      landingPageUrl: event.hasLandingPage ? this.getLandingPageUrl(event.id) : null,
     };
   }
 
@@ -105,6 +116,7 @@ export class EventService {
         remainingTickets,
         isSoldOut,
         inviteUrl: this.getInviteUrl(event.inviteToken),
+        landingPageUrl: event.hasLandingPage ? this.getLandingPageUrl(event.id) : null,
       };
     });
   }
@@ -141,6 +153,7 @@ export class EventService {
       remainingTickets,
       isSoldOut,
       inviteUrl: this.getInviteUrl(event.inviteToken),
+      landingPageUrl: event.hasLandingPage ? this.getLandingPageUrl(event.id) : null,
     };
   }
 
@@ -185,6 +198,11 @@ export class EventService {
         location: data.location !== undefined ? data.location : existingEvent.location,
         maxTickets: data.maxTickets ?? existingEvent.maxTickets,
         status: data.status ?? existingEvent.status,
+        hasLandingPage: data.hasLandingPage !== undefined ? data.hasLandingPage : existingEvent.hasLandingPage,
+        landingTemplate: data.landingTemplate !== undefined ? data.landingTemplate : existingEvent.landingTemplate,
+        primaryColor: data.primaryColor !== undefined ? data.primaryColor : existingEvent.primaryColor,
+        bannerUrl: data.bannerUrl !== undefined ? data.bannerUrl : existingEvent.bannerUrl,
+        ctaText: data.ctaText !== undefined ? data.ctaText : existingEvent.ctaText,
       },
       include: {
         createdBy: {
@@ -201,6 +219,7 @@ export class EventService {
       remainingTickets: Math.max(0, updatedEvent.maxTickets - activeGuestsCount),
       isSoldOut: activeGuestsCount >= updatedEvent.maxTickets,
       inviteUrl: this.getInviteUrl(updatedEvent.inviteToken),
+      landingPageUrl: updatedEvent.hasLandingPage ? this.getLandingPageUrl(updatedEvent.id) : null,
     };
   }
 
@@ -324,7 +343,7 @@ export class EventService {
   }
 
   // ============================================
-  // MÉTODOS PÚBLICOS (Para convidados / participantes)
+  // MÉTODOS PÚBLICOS (Para convidados / participantes / Landing Pages)
   // ============================================
 
   async getPublicEvent(inviteToken: string) {
@@ -361,6 +380,63 @@ export class EventService {
       isSoldOut,
       status: event.status,
       inviteToken: event.inviteToken,
+      hasLandingPage: event.hasLandingPage,
+      landingTemplate: event.landingTemplate,
+      primaryColor: event.primaryColor,
+      bannerUrl: event.bannerUrl,
+      ctaText: event.ctaText,
+      landingPageUrl: event.hasLandingPage ? this.getLandingPageUrl(event.id) : null,
+      ong: {
+        id: event.ong.id,
+        name: event.ong.name,
+        description: event.ong.description,
+      },
+    };
+  }
+
+  async getPublicLandingPage(eventId: string) {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        ong: {
+          select: { id: true, name: true, description: true, active: true },
+        },
+        guests: {
+          where: { status: { not: "cancelado" } },
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!event || !event.ong || !event.ong.active) {
+      throw new AppError("Evento não encontrado ou inativo.", 404);
+    }
+
+    if (!event.hasLandingPage) {
+      throw new AppError("Este evento não possui página de divulgação pública habilitada.", 404);
+    }
+
+    const totalGuests = event.guests.length;
+    const remainingTickets = Math.max(0, event.maxTickets - totalGuests);
+    const isSoldOut = totalGuests >= event.maxTickets;
+
+    return {
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: event.date,
+      location: event.location,
+      maxTickets: event.maxTickets,
+      totalGuests,
+      remainingTickets,
+      isSoldOut,
+      status: event.status,
+      inviteToken: event.inviteToken,
+      hasLandingPage: event.hasLandingPage,
+      landingTemplate: event.landingTemplate || "modern",
+      primaryColor: event.primaryColor || "#7c3aed",
+      bannerUrl: event.bannerUrl,
+      ctaText: event.ctaText || "Garantir meu Ingresso",
       ong: {
         id: event.ong.id,
         name: event.ong.name,
@@ -388,7 +464,6 @@ export class EventService {
         throw new AppError(`Este evento está ${event.status} e não aceita mais inscrições.`, 400);
       }
 
-      // Verifica se o e-mail já está inscrito neste evento
       const existingRegistration = await tx.eventGuest.findUnique({
         where: {
           eventId_email: {
@@ -402,7 +477,6 @@ export class EventService {
         if (existingRegistration.status !== "cancelado") {
           throw new AppError("Este endereço de e-mail já está cadastrado para este evento.", 400);
         }
-        // Se tinha cancelado anteriormente, podemos reativar
         const updated = await tx.eventGuest.update({
           where: { id: existingRegistration.id },
           data: {
@@ -424,7 +498,6 @@ export class EventService {
         };
       }
 
-      // Checa contagem de vagas dentro da transação para consistência
       const activeCount = await tx.eventGuest.count({
         where: {
           eventId: event.id,

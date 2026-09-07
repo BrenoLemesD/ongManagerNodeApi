@@ -127,15 +127,20 @@ model Event {
   date        DateTime
   location    String?
   maxTickets  Int
-  status      String       @default("ativo") // "ativo" | "encerrado" | "cancelado"
-  inviteToken String       @unique
-  ongId       String
-  createdById String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  ong         Ong          @relation(fields: [ongId], references: [id], onDelete: Cascade)
-  createdBy   User         @relation("EventsCreated", fields: [createdById], references: [id])
-  guests      EventGuest[]
+  status          String       @default("ativo") // "ativo" | "encerrado" | "cancelado"
+  inviteToken     String       @unique
+  hasLandingPage  Boolean      @default(false)
+  landingTemplate String?      @default("modern") // "modern" | "warm" | "minimal"
+  primaryColor    String?      @default("#7c3aed")
+  bannerUrl       String?
+  ctaText         String?      @default("Garantir meu Ingresso")
+  ongId           String
+  createdById     String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  ong             Ong          @relation(fields: [ongId], references: [id], onDelete: Cascade)
+  createdBy       User         @relation("EventsCreated", fields: [createdById], references: [id])
+  guests          EventGuest[]
 
   @@index([ongId, date])
   @@index([ongId, status])

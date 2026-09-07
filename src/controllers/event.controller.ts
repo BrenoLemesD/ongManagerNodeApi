@@ -135,4 +135,15 @@ export class EventController {
       next(error);
     }
   }
+
+  async getPublicLandingPage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { eventId } = req.params;
+      const landing = await eventService.getPublicLandingPage(eventId);
+      res.status(200).json(landing);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+
