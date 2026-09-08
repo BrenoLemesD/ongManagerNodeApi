@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createEventSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
-  description: z.string().optional(),
+  description: z.string().min(1, "Descrição do evento é obrigatória"),
   date: z.string().min(1, "Data e horário do evento são obrigatórios"),
   location: z.string().optional(),
   maxTickets: z.coerce.number().int().min(1, "A quantidade de ingressos deve ser de no mínimo 1"),
