@@ -8,9 +8,9 @@ const authController = new AuthController();
 
 /**
  * @openapi
- * /auth/register:
+ * /auth/send-verification-code:
  *   post:
- *     summary: Registrar novo usuário e opcionalmente criar uma ONG inicial
+ *     summary: Enviar código de 6 dígitos para validação de e-mail ao criar ONG
  *     tags: [Autenticação]
  *     requestBody:
  *       required: true
@@ -18,7 +18,35 @@ const authController = new AuthController();
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, email, password]
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: joao@example.com
+ *               ongName:
+ *                 type: string
+ *                 example: ONG Esperança
+ *     responses:
+ *       200:
+ *         description: Código enviado com sucesso.
+ *       400:
+ *         description: E-mail inválido ou já cadastrado.
+ */
+router.post("/send-verification-code", authLimiter, authController.sendVerificationCode);
+
+/**
+ * @openapi
+ * /auth/register:
+ *   post:
+ *     summary: Registrar novo usuário e opcionalmente criar uma ONG inicial com validação de código
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, email, password, code]
  *             properties:
  *               name:
  *                 type: string
@@ -29,6 +57,9 @@ const authController = new AuthController();
  *               password:
  *                 type: string
  *                 example: 123456
+ *               code:
+ *                 type: string
+ *                 example: "123456"
  *               ongName:
  *                 type: string
  *                 example: ONG Esperança
@@ -36,7 +67,7 @@ const authController = new AuthController();
  *       201:
  *         description: Usuário cadastrado com sucesso e cookie de sessão gerado.
  *       400:
- *         description: E-mail já cadastrado ou dados inválidos.
+ *         description: Código inválido, e-mail já cadastrado ou dados inválidos.
  */
 router.post("/register", authController.register);
 

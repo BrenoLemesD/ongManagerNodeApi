@@ -3,18 +3,87 @@ import crypto from "crypto";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
 import { env } from "../config/env.js";
-import { sendMail } from "../config/mail.js";
-import { RegisterInput, LoginInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordInput, AuthResponse } from "../interfaces/auth.interface.js";
+import { sendMail, sendMailSafe } from "../config/mail.js";
+import { resetPasswordEmailTemplate } from "../templates/emails/resetPassword.template.js";
+import { verificationCodeEmailTemplate } from "../templates/emails/verificationCode.template.js";
+import { passwordChangedEmailTemplate } from "../templates/emails/passwordChanged.template.js";
+import { RegisterInput, LoginInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordInput, AuthResponse, SendVerificationCodeInput } from "../interfaces/auth.interface.js";
 import { AppError } from "../middlewares/error.middleware.js";
 
 export class AuthService {
-  async register(data: RegisterInput): Promise<AuthResponse> {
+  async sendVerificationCode(data: SendVerificationCodeInput) {
+    const cleanEmail = data.email.toLowerCase().trim();
+
     const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: cleanEmail },
+    });
+
+    if (existingUser) {
+      throw new AppError("E-mail já está em uso por outra conta", 400);
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
+
+    await prisma.emailVerificationCode.deleteMany({
+      where: {
+        email: cleanEmail,
+        type: "register_ong",
+      },
+    });
+
+    await prisma.emailVerificationCode.create({
+      data: {
+        email: cleanEmail,
+        code,
+        type: "register_ong",
+        expiresAt,
+      },
+    });
+
+    const html = verificationCodeEmailTemplate({
+      code,
+      ongName: data.ongName,
+    });
+
+    await sendMail({
+      to: cleanEmail,
+      subject: "Código de Verificação - ONGManager",
+      html,
+    });
+
+    return {
+      message: "Código de verificação enviado com sucesso",
+      expiresInSeconds: 600,
+    };
+  }
+
+  async register(data: RegisterInput): Promise<AuthResponse> {
+    const cleanEmail = data.email.toLowerCase().trim();
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: cleanEmail },
     });
 
     if (existingUser) {
       throw new AppError("E-mail já está em uso", 400);
+    }
+
+    const verification = await prisma.emailVerificationCode.findFirst({
+      where: {
+        email: cleanEmail,
+        code: data.code.trim(),
+        type: "register_ong",
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!verification) {
+      throw new AppError("Código de verificação inválido", 400);
+    }
+
+    if (verification.expiresAt < new Date()) {
+      throw new AppError("Código de verificação expirado. Por favor, solicite um novo código.", 400);
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -22,7 +91,7 @@ export class AuthService {
     const user = await prisma.user.create({
       data: {
         name: data.name,
-        email: data.email,
+        email: cleanEmail,
         password: hashedPassword,
       },
     });
@@ -31,6 +100,7 @@ export class AuthService {
       const ong = await prisma.ong.create({
         data: {
           name: data.ongName,
+          cnpj: data.ongCnpj || null,
           description: `ONG criada por ${user.name}`,
         },
       });
@@ -43,6 +113,14 @@ export class AuthService {
         },
       });
     }
+
+    // Limpa os códigos de verificação após uso com sucesso
+    await prisma.emailVerificationCode.deleteMany({
+      where: {
+        email: cleanEmail,
+        type: "register_ong",
+      },
+    });
 
     const options: SignOptions = { expiresIn: "7d" };
     const token = jwt.sign(
@@ -102,6 +180,7 @@ export class AuthService {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
         createdAt: true,
       },
@@ -123,10 +202,14 @@ export class AuthService {
       throw new AppError("Usuário não encontrado", 404);
     }
 
-    const updateData: { name?: string; email?: string; password?: string } = {};
+    const updateData: { name?: string; email?: string; phone?: string | null; password?: string } = {};
 
     if (data.name && data.name.trim() !== "") {
       updateData.name = data.name;
+    }
+
+    if (data.phone !== undefined) {
+      updateData.phone = data.phone;
     }
 
     if (data.email && data.email !== user.email) {
@@ -159,10 +242,36 @@ export class AuthService {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
         updatedAt: true,
       },
     });
+
+    if (data.newPassword) {
+      try {
+        const nowFormatted = new Date().toLocaleString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+          dateStyle: "short",
+          timeStyle: "short",
+        });
+        const supportUrl = `${env.FRONTEND_URL || "http://localhost:5173"}/forgot-password`;
+
+        const html = passwordChangedEmailTemplate({
+          userName: updatedUser.name,
+          changedAt: nowFormatted,
+          supportUrl,
+        });
+
+        sendMailSafe({
+          to: updatedUser.email,
+          subject: "[Segurança] Sua senha foi alterada no ONGManager",
+          html,
+        });
+      } catch (err) {
+        console.error("[AUTH][EMAIL] Erro ao enviar alerta de senha alterada:", err);
+      }
+    }
 
     return updatedUser;
   }
@@ -190,20 +299,10 @@ export class AuthService {
     const frontendUrl = env.FRONTEND_URL || "http://localhost:5173";
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-        <h2>Recuperação de Senha - ONGManager</h2>
-        <p>Olá, <strong>${user.name}</strong>!</p>
-        <p>Recebemos uma solicitação para redefinir a sua senha de acesso à plataforma ONGManager.</p>
-        <p>Clique no botão abaixo para redefinir a sua senha (este link expira em 1 hora):</p>
-        <p style="margin: 20px 0;">
-          <a href="${resetUrl}" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-            Redefinir Minha Senha
-          </a>
-        </p>
-        <p style="font-size: 12px; color: #666;">Se você não solicitou a alteração, ignore este e-mail.</p>
-      </div>
-    `;
+    const htmlContent = resetPasswordEmailTemplate({
+      name: user.name,
+      resetUrl,
+    });
 
     await sendMail({
       to: user.email,

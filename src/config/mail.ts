@@ -9,15 +9,21 @@ async function getTransporter(): Promise<Transporter> {
   }
 
   transporterPromise = (async () => {
-    // Se houver configuração de SMTP personalizada no .env (ex: Gmail, Resend, SendGrid)
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const host = env.SMTP_HOST || process.env.SMTP_HOST;
+    const user = env.SMTP_USER || process.env.SMTP_USER;
+    const pass = env.SMTP_PASS || process.env.SMTP_PASS;
+    const port = Number(env.SMTP_PORT || process.env.SMTP_PORT) || 587;
+    const secure = (env.SMTP_SECURE || process.env.SMTP_SECURE) === "true";
+
+    if (host && user && pass) {
+      console.log(`[MAIL] Conectando ao provedor SMTP configurado: ${host}:${port} com o usuário ${user}...`);
       return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_SECURE === "true",
+        host,
+        port,
+        secure,
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user: user.trim(),
+          pass: pass.replace(/\s+/g, ""),
         },
       });
     }
@@ -51,7 +57,7 @@ export async function sendMail({ to, subject, html }: SendMailOptions): Promise<
   try {
     const transporter = await getTransporter();
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"ONGManager" <noreply@ongmanager.org>',
+      from: env.SMTP_FROM || process.env.SMTP_FROM || '"ONGManager" <noreply@ongmanager.org>',
       to,
       subject,
       html,
@@ -67,5 +73,15 @@ export async function sendMail({ to, subject, html }: SendMailOptions): Promise<
   } catch (error) {
     console.error("[MAIL] Erro ao enviar e-mail:", error);
     throw error;
+  }
+}
+
+export async function sendMailSafe(options: SendMailOptions): Promise<boolean> {
+  try {
+    await sendMail(options);
+    return true;
+  } catch (error) {
+    console.error(`[MAIL][SAFE] Falha não impeditiva ao enviar e-mail para ${options.to}:`, error);
+    return false;
   }
 }

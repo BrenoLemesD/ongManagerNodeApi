@@ -1,10 +1,20 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/auth.service.js";
-import { registerSchema, loginSchema, updateProfileSchema, forgotPasswordSchema, resetPasswordSchema } from "../interfaces/auth.interface.js";
+import { registerSchema, loginSchema, updateProfileSchema, forgotPasswordSchema, resetPasswordSchema, sendVerificationCodeSchema } from "../interfaces/auth.interface.js";
 
 const authService = new AuthService();
 
 export class AuthController {
+  async sendVerificationCode(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = sendVerificationCodeSchema.parse(req.body);
+      const result = await authService.sendVerificationCode(data);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const data = registerSchema.parse(req.body);

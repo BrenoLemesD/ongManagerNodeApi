@@ -5,6 +5,9 @@ import { authMiddleware } from "../middlewares/auth.middleware.js";
 const router = Router();
 const ongController = new OngController();
 
+// Rota pública para consultar detalhes do convite de ONG antes do login/cadastro
+router.get("/invites/:token", ongController.getInviteDetails);
+
 router.use(authMiddleware);
 
 /**
@@ -107,6 +110,7 @@ router.get("/", ongController.getUserOngs);
  *         description: ONG desativada (Soft Delete).
  */
 router.get("/:id", ongController.getOngById);
+router.get("/:id/dashboard-stats", ongController.getDashboardStats);
 router.put("/:id", ongController.updateOng);
 router.delete("/:id", ongController.deleteOng);
 
@@ -147,7 +151,6 @@ router.post("/:id/invites", ongController.generateInviteLink);
  *       200:
  *         description: Detalhes da ONG vinculada ao convite.
  */
-router.get("/invites/:token", ongController.getInviteDetails);
 
 /**
  * @openapi

@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { prisma } from "../config/prisma.js";
 import { env } from "../config/env.js";
+import { sendMailSafe } from "../config/mail.js";
+import { eventTicketEmailTemplate } from "../templates/emails/eventTicket.template.js";
 import { AppError } from "../middlewares/error.middleware.js";
 import {
   CreateEventInput,
@@ -446,7 +448,7 @@ export class EventService {
   }
 
   async registerPublicGuest(inviteToken: string, data: RegisterGuestInput) {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const event = await tx.event.findUnique({
         where: { inviteToken },
         include: {
@@ -534,5 +536,36 @@ export class EventService {
         },
       };
     });
+
+    // Envio seguro do ingresso por e-mail para o participante
+    try {
+      const dateFormatted = new Date(result.event.date).toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        dateStyle: "full",
+        timeStyle: "short",
+      });
+
+      const eventUrl = `${env.FRONTEND_URL || "http://localhost:5173"}/eventos/${result.event.id}`;
+
+      const html = eventTicketEmailTemplate({
+        guestName: result.guest.name,
+        ongName: result.event.ongName,
+        eventTitle: result.event.title,
+        eventDate: dateFormatted,
+        eventLocation: result.event.location,
+        ticketCode: result.guest.ticketCode,
+        eventUrl,
+      });
+
+      sendMailSafe({
+        to: result.guest.email,
+        subject: `[Ingresso Confirmado] ${result.event.title} - ${result.event.ongName}`,
+        html,
+      });
+    } catch (err) {
+      console.error("[EVENT][EMAIL] Erro ao enviar ingresso por e-mail:", err);
+    }
+
+    return result;
   }
 }

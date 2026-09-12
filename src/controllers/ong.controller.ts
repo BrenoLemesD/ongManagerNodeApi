@@ -137,4 +137,15 @@ export class OngController {
       next(error);
     }
   }
+
+  async getDashboardStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const stats = await ongService.getDashboardStats(req.user!.id, id);
+      res.status(200).json(stats);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

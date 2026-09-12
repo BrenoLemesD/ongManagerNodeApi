@@ -1,8 +1,109 @@
 import { prisma } from "../config/prisma.js";
+import { env } from "../config/env.js";
+import { sendMailSafe } from "../config/mail.js";
+import { taskCompletedEmailTemplate } from "../templates/emails/taskCompleted.template.js";
+import { taskAssignedEmailTemplate } from "../templates/emails/taskAssigned.template.js";
 import { CreateTaskInput, UpdateTaskInput, UpdateTaskStatusInput } from "../interfaces/kanban.interface.js";
 import { AppError } from "../middlewares/error.middleware.js";
 
 export class KanbanService {
+  private async notifyAdminsTaskCompleted(ongId: string, task: any, actorUserId: string) {
+    try {
+      const [admins, actor, ong] = await Promise.all([
+        prisma.userOng.findMany({
+          where: { ongId, role: "admin", active: true },
+          include: { user: { select: { id: true, name: true, email: true } } },
+        }),
+        prisma.user.findUnique({
+          where: { id: actorUserId },
+          select: { name: true, email: true },
+        }),
+        prisma.ong.findUnique({
+          where: { id: ongId },
+          select: { name: true },
+        }),
+      ]);
+
+      const nowFormatted = new Date().toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        dateStyle: "short",
+        timeStyle: "short",
+      });
+
+      const ongName = ong?.name || "Sua ONG";
+      const completedByName = actor?.name || "Membro da ONG";
+      const completedByEmail = actor?.email || "";
+      const boardUrl = `${env.FRONTEND_URL || "http://localhost:5173"}/kanban`;
+
+      for (const adminMembership of admins) {
+        if (adminMembership.user?.email) {
+          const html = taskCompletedEmailTemplate({
+            adminName: adminMembership.user.name,
+            ongName,
+            taskTitle: task.title,
+            taskDescription: task.description,
+            completedByName,
+            completedByEmail,
+            completedAt: nowFormatted,
+            taskPriority: task.priority,
+            boardUrl,
+          });
+
+          sendMailSafe({
+            to: adminMembership.user.email,
+            subject: `[Concluída] ${task.title} - ${ongName}`,
+            html,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[KANBAN][EMAIL] Erro ao notificar administradores sobre tarefa concluída:", err);
+    }
+  }
+
+  private async notifyUserTaskAssigned(ongId: string, task: any, assignedByUserId: string) {
+    try {
+      if (!task.assignedTo?.email) return;
+
+      const [assignedBy, ong] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: assignedByUserId },
+          select: { name: true },
+        }),
+        prisma.ong.findUnique({
+          where: { id: ongId },
+          select: { name: true },
+        }),
+      ]);
+
+      const deadlineFormatted = task.deadline
+        ? new Date(task.deadline).toLocaleDateString("pt-BR")
+        : null;
+
+      const ongName = ong?.name || "Sua ONG";
+      const boardUrl = `${env.FRONTEND_URL || "http://localhost:5173"}/kanban`;
+
+      const html = taskAssignedEmailTemplate({
+        userName: task.assignedTo.name,
+        ongName,
+        taskTitle: task.title,
+        taskDescription: task.description,
+        priority: task.priority,
+        deadline: deadlineFormatted,
+        assignedByName: assignedBy?.name || "Administrador",
+        boardUrl,
+      });
+
+      sendMailSafe({
+        to: task.assignedTo.email,
+        subject: `[Nova Tarefa] ${task.title} - ${ongName}`,
+        html,
+      });
+    } catch (err) {
+      console.error("[KANBAN][EMAIL] Erro ao notificar usuário sobre tarefa atribuída:", err);
+    }
+  }
+
   private async getMembership(userId: string, ongId: string) {
     const membership = await prisma.userOng.findUnique({
       where: {
@@ -20,7 +121,7 @@ export class KanbanService {
     return membership;
   }
 
-  private async resolveAssignedUserId(assignedToId: string | undefined, ongId: string): Promise<string | null> {
+  private async resolveAssignedUserId(assignedToId: string | null | undefined, ongId: string): Promise<string | null> {
     if (!assignedToId || assignedToId.trim() === "") {
       return null;
     }
@@ -91,6 +192,10 @@ export class KanbanService {
         newStatus: "a_fazer",
       },
     });
+
+    if (task.assignedToId && task.assignedTo) {
+      this.notifyUserTaskAssigned(ongId, task, userId);
+    }
 
     return task;
   }
@@ -183,6 +288,16 @@ export class KanbanService {
       },
     });
 
+    // Se mudou o responsável, avisa o novo responsável
+    if (updatedTask.assignedToId && updatedTask.assignedToId !== existingTask.assignedToId) {
+      this.notifyUserTaskAssigned(ongId, updatedTask, userId);
+    }
+
+    // Se mudou o status para concluído, avisa todos os admins da ONG
+    if (updatedTask.status === "concluido" && existingTask.status !== "concluido") {
+      this.notifyAdminsTaskCompleted(ongId, updatedTask, userId);
+    }
+
     return updatedTask;
   }
 
@@ -228,6 +343,11 @@ export class KanbanService {
         newStatus: data.status,
       },
     });
+
+    // Se mudou o status para concluído, avisa todos os admins da ONG
+    if (data.status === "concluido" && existingTask.status !== "concluido") {
+      this.notifyAdminsTaskCompleted(ongId, updatedTask, userId);
+    }
 
     return updatedTask;
   }

@@ -2,11 +2,13 @@ import { z } from "zod";
 
 export const createOngSchema = z.object({
   name: z.string().min(2, "Nome da ONG deve ter no mínimo 2 caracteres"),
+  cnpj: z.string().optional(),
   description: z.string().optional(),
 });
 
 export const updateOngSchema = z.object({
   name: z.string().min(2, "Nome da ONG deve ter no mínimo 2 caracteres").optional(),
+  cnpj: z.string().optional(),
   description: z.string().optional(),
 });
 

@@ -4,8 +4,8 @@ export const createTaskSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
   description: z.string().optional(),
   priority: z.enum(["baixa", "media", "alta", "urgente"]).default("media"),
-  deadline: z.string().optional(),
-  assignedToId: z.string().optional(),
+  deadline: z.string().nullable().optional(),
+  assignedToId: z.string().nullable().optional(),
 });
 
 export const updateTaskSchema = z.object({
@@ -13,8 +13,8 @@ export const updateTaskSchema = z.object({
   description: z.string().optional(),
   priority: z.enum(["baixa", "media", "alta", "urgente"]).optional(),
   status: z.enum(["a_fazer", "em_andamento", "aguardando_aprovacao", "concluido"]).optional(),
-  deadline: z.string().optional(),
-  assignedToId: z.string().optional(),
+  deadline: z.string().nullable().optional(),
+  assignedToId: z.string().nullable().optional(),
 });
 
 export const updateTaskStatusSchema = z.object({

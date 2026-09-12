@@ -12,6 +12,7 @@ model User {
   name               String
   email              String               @unique
   password           String
+  phone              String?
   role               String               @default("user")
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
@@ -26,6 +27,7 @@ model User {
 model Ong {
   id                    String              @id @default(cuid())
   name                  String
+  cnpj                  String?
   description           String?
   active                Boolean             @default(true)
   createdAt             DateTime            @default(now())
@@ -60,6 +62,7 @@ model UserOng {
   userId                String
   ongId                 String
   role                  String      @default("member") // "admin" | "finance_manager" | "member"
+  active                Boolean     @default(true)
   createdAt             DateTime    @default(now())
   user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   ong                   Ong         @relation(fields: [ongId], references: [id], onDelete: Cascade)
@@ -160,4 +163,15 @@ model EventGuest {
 
   @@unique([eventId, email])
   @@index([eventId, status])
+}
+
+model EmailVerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  type      String   @default("register_ong")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, type])
 }
