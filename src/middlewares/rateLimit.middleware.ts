@@ -1,9 +1,9 @@
 import rateLimit from "express-rate-limit";
 
-// Rate Limiter Global: Máximo de 100 requisições a cada 15 minutos por IP
+// Rate Limiter Global: Relaxado em desenvolvimento para testes/capturas
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  limit: 100,
+  limit: process.env.NODE_ENV === "production" ? 100 : 1000,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
@@ -11,10 +11,10 @@ export const globalLimiter = rateLimit({
   },
 });
 
-// Rate Limiter Estrito para Autenticação (Login / Forgot Password): Máximo de 10 tentativas por 15 minutos por IP
+// Rate Limiter Estrito para Autenticação: Relaxado em desenvolvimento
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  limit: 10,
+  limit: process.env.NODE_ENV === "production" ? 10 : 500,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
